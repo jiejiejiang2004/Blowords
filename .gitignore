@@ -1,43 +1,46 @@
 # Maven 构建目录
 target/
+
 # Maven Wrapper
 !.mvn/wrapper/maven-wrapper.jar
+
 # 日志文件
 *.log
 logs/
 log/
+
 # 临时文件
 temp/
+
 # IntelliJ IDEA 配置文件
-idea/
+.idea
+*.iws
 *.iml
 *.ipr
+
 # Eclipse/STS 配置文件
 classpath
 project
 settings/
 springBeans
+
 # VS Code 配置文件
 vscode/
 trae/
+
 # 操作系统生成的文件
 DS_Store
+
 # 编译生成的二进制文件
 *.class
+
 # 压缩包和归档文件
 *.jar
 *.war
 *.zip
+
 # Gradle 缓存目录
 gradle/
-
-
-.mvn
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
 
 ### STS ###
 .apt_generated
@@ -48,21 +51,22 @@ target/
 .springBeans
 .sts4-cache
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
+
+.mvn
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### VS Code ###
-.vscode/
+# 配置文件
+src/main/resources/application.yml
