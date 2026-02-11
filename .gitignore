@@ -1,0 +1,32 @@
+# Maven 构建目录
+target/
+# Maven Wrapper
+!.mvn/wrapper/maven-wrapper.jar
+# 日志文件
+*.log
+logs/
+log/
+# 临时文件
+temp/
+# IntelliJ IDEA 配置文件
+idea/
+*.iml
+*.ipr
+# Eclipse/STS 配置文件
+classpath
+project
+settings/
+springBeans
+# VS Code 配置文件
+vscode/
+trae/
+# 操作系统生成的文件
+DS_Store
+# 编译生成的二进制文件
+*.class
+# 压缩包和归档文件
+*.jar
+*.war
+*.zip
+# Gradle 缓存目录
+gradle/
