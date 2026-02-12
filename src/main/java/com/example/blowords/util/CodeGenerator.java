@@ -20,7 +20,7 @@ public class CodeGenerator {
         FastAutoGenerator.create(url, username, password)
                 // 全局配置
                 .globalConfig(builder -> {
-                    builder.author("你的名字") // 设置作者
+                    builder.author("杰杰酱") // 设置作者
                             .outputDir(System.getProperty("user.dir") + "/src/main/java") // 输出目录
                             .enableSwagger() // 开启Swagger（适配Knife4j）
                             .commentDate("yyyy-MM-dd") // 注释日期格式

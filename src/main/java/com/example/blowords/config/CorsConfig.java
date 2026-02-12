@@ -18,8 +18,11 @@ public class CorsConfig {
         // 允许跨域携带Cookie
         config.setAllowCredentials(true);
 
-        // 允许所有请求方法（GET/POST/PUT/DELETE等）
-        config.addAllowedMethod("*");
+        // 允许请求方法
+        config.addAllowedMethod("GET");
+        config.addAllowedMethod("POST");
+        config.addAllowedMethod("PUT");
+        config.addAllowedMethod("DELETE");
 
         // 允许所有请求头
         config.addAllowedHeader("*");
