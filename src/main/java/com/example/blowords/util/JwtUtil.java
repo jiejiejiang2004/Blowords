@@ -19,9 +19,10 @@ public class JwtUtil {
     // JWT密钥（自定义，越长越安全）
     private static final String SECRET_KEY = "your-secret-key-1234567890-abcdefghijklmnopqrstuvwxyz";
     // Token过期时间（2小时）
-    private static final long EXPIRATION_TIME = 7200000;
+    private static final long EXPIRATION_TIME = 43200000;
+    // 12 * 3600 * 1000 = 43200000
 
-    // 生成Token
+    // 生成Token 
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, userDetails.getUsername());
