@@ -22,14 +22,23 @@ public class JwtUtil {
     private static final long EXPIRATION_TIME = 43200000;
     // 12 * 3600 * 1000 = 43200000
 
+    private static final String REFRESH_SECRET_KEY = "your-secret-key-1234567890-abcdefghijklmnopqrstuvwxyz";
+    // Token过期时间（7天）
+    private static final long REFRESH_EXPIRATION_TIME = 604800000;
+
     // 生成Token 
-    public String generateToken(UserDetails userDetails) {
+    public String generateToken(UserDetails userDetails, String secretKey, long expirationTime) {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, userDetails.getUsername());
+        return createToken(claims, userDetails.getUsername(), secretKey, expirationTime);
+    }
+
+    public String generateRefreshToken(UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>();
+        return createToken(claims, userDetails.getUsername(), REFRESH_SECRET_KEY, REFRESH_EXPIRATION_TIME);
     }
 
     // 创建Token
-    private String createToken(Map<String, Object> claims, String subject) {
+    private String createToken(Map<String, Object> claims, String subject, String secretKey, long expirationTime) {
         return Jwts.builder()
                 .claims(claims)
                 .subject(subject)

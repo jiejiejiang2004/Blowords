@@ -46,6 +46,10 @@ public class User implements Serializable {
     @Schema(description = "邮箱")
     private String email;
 
+    @TableField("telephone")
+    @Schema(description = "手机号")
+    private String telephone;
+
     @TableField("role")
     @Schema(description = "角色")
     private String role;
@@ -54,12 +58,27 @@ public class User implements Serializable {
     @Schema(description = "创建时间")
     private LocalDateTime createTime;
 
-    public User(Integer userid, String username, String password, String email, String role, LocalDateTime createTime) {
+    public User(Integer userid, String username, String password, String email, String telephone, String role, LocalDateTime createTime) {
         this.userid = userid;
         this.username = username;
         this.password = password;
         this.email = email;
+        this.telephone = telephone;
         this.role = role;
         this.createTime = createTime;
+    }
+
+    public User(String username, String password, String email, String telephone, String role, LocalDateTime createTime) {
+        this.userid = null;
+        this.username = username;
+        this.password = password;
+        this.email = email;
+        this.telephone = telephone;
+        this.role = role;
+        this.createTime = createTime;
+    }
+
+    public void setUserid(Integer userid) {
+        this.userid = userid;
     }
 }

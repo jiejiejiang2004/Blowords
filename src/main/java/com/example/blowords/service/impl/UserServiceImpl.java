@@ -12,6 +12,9 @@ import com.example.blowords.mapper.UserMapper;
 import com.example.blowords.mapper.impl.UserMapperImpl;
 import com.example.blowords.service.UserService;
 
+import java.time.LocalDateTime;
+import com.example.blowords.util.PasswordEncryptUtil;
+
 /**
  * <p>
  *  服务实现类
@@ -44,4 +47,59 @@ public class UserServiceImpl extends ServiceImpl<UserMapperImpl, User> implement
                 .build();
     }
 
+    @Override
+    public User register(String username, String email, String password, String telephone) {
+        // 检查用户名是否已存在
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("username", username)) != null) {
+            throw new IllegalArgumentException("用户名已存在");
+        }
+        
+        // 检查邮箱是否已存在
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("email", email)) != null) {
+            throw new IllegalArgumentException("邮箱已存在");
+        }
+
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("telephone", telephone)) != null) {
+            throw new IllegalArgumentException("手机号已存在");
+        }
+
+        password = PasswordEncryptUtil.encrypt(password);
+
+        // 创建新用户
+        User user = new User(username, password, email, telephone, "USER", LocalDateTime.now());
+        
+        // 保存用户到数据库
+        userMapper.insert(user);
+
+        String UserID = userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getUserid().toString();
+        user.setUserid(Integer.parseInt(UserID));
+        
+        return user;
+    }
+
+    @Override
+    public User register(String username, String email, String password) {
+        // 检查用户名是否已存在
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("username", username)) != null) {
+            throw new IllegalArgumentException("用户名已存在");
+        }
+        
+        // 检查邮箱是否已存在
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("email", email)) != null) {
+            throw new IllegalArgumentException("邮箱已存在");
+        }
+
+        password = PasswordEncryptUtil.encrypt(password);
+
+        // 创建新用户
+        User user = new User(username, password, email, null, "USER", LocalDateTime.now());
+        
+        // 保存用户到数据库
+        userMapper.insert(user);
+
+        String UserID = userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getUserid().toString();
+        user.setUserid(Integer.parseInt(UserID));
+        
+        return user;
+    }
 }
