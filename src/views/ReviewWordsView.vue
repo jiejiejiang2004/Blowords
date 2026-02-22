@@ -2,7 +2,7 @@
 </script>
 
 <template>
-  <router-view />
+  <h1>ReviewWords</h1>
 </template>
 
 <style scoped lang="less"></style>

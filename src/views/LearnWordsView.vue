@@ -2,7 +2,8 @@
 </script>
 
 <template>
-  <router-view />
+  <h1>LearnWords</h1>
+
 </template>
 
 <style scoped lang="less"></style>
