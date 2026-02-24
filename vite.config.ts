@@ -30,7 +30,7 @@ export default defineConfig({
     proxy: {
       // 代理后端API请求
       '/api': {
-        target: 'http://localhost:8080', // 后端地址
+        target: 'http://localhost:8000', // 后端地址
         changeOrigin: true,
         secure: false
       }
