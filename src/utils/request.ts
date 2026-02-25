@@ -11,12 +11,13 @@ const instance = axios.create({
 instance.interceptors.request.use((config) => {
     // 在发送请求之前做些什么
     const userStore = useUserStore()
-    if (userStore.token) {
-        config.headers.Authorization = 'Bearer ' + userStore.token
+    if (userStore.accessToken) {
+        config.headers.Authorization = 'Bearer ' + userStore.accessToken
     }
     return config
 }, (error) => {
     // 对请求错误做些什么
+    showFailToast('请求错误')
     return Promise.reject(error)
 })
 

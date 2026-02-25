@@ -1,14 +1,6 @@
 import { defineStore } from 'pinia'
+import type { UserInfo } from '@/utils/types'
 
-export interface UserInfo {
-    uid: string,
-    username: string,
-    nickname: string,
-    phoneNumber: string,
-    email: string,
-    avatarUrl: string,
-    token: string
-}
 
 export const useUserStore = defineStore('user', {
     state: () => ({
@@ -18,11 +10,12 @@ export const useUserStore = defineStore('user', {
         phoneNumber: '',
         email: '',
         avatarUrl: '',
-        token: ''
+        refreshToken: '',
+        accessToken: ''
     }),
     getters: {
         isLogin(state) {
-            return state.token !== ''
+            return state.refreshToken !== ''
         }
     },
     actions: {
@@ -33,7 +26,8 @@ export const useUserStore = defineStore('user', {
             this.phoneNumber = user.phoneNumber
             this.email = user.email
             this.avatarUrl = user.avatarUrl
-            this.token = user.token
+            this.refreshToken = user.refreshToken
+            this.accessToken = user.accessToken
         },
         logout() {
             this.uid = ''
@@ -42,7 +36,11 @@ export const useUserStore = defineStore('user', {
             this.phoneNumber = ''
             this.email = ''
             this.avatarUrl = ''
-            this.token = ''
+            this.refreshToken = ''
+            this.accessToken = ''
         }
+    },
+    persist: {
+        key: 'bw-user'
     }
 })

@@ -3,7 +3,9 @@ import { closeToast, showLoadingToast, showToast } from 'vant'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { userCaptcha, userLogin, userRegister } from '@/api/login'
+import { useUserStore } from '@/store/useUserStore'
 const router = useRouter()
+const userStore = useUserStore()
 const loginMode = ref<boolean>(true)
 
 const account = ref<string>('')
@@ -20,16 +22,23 @@ const btnContent = computed<string>(() => {
   return captchaSecond.value <= 0 ? '获取验证码' : `验证码 ${captchaSecond.value}s`
 })
 
+const emailReg = /^[a-zA-Z0-9]+([._-][a-zA-Z0-9]+)*@[a-zA-Z0-9]+([.-][a-zA-Z0-9]+)*\.[a-zA-Z]{2,}$/
+const usernameReg = /^[a-zA-Z0-9_]{1,16}$/
+const captchaReg = /^[0-9]{6}$/
+const passwordReg = /^[a-zA-Z0-9\+\-\*\/_=\.@!#$%^&?:;,]{8,16}$/
+const alphabetReg = /[a-zA-Z]/
+const labelWidth = '64px'
+
 const onLogin = async () => {
-  console.log('login')
   showLoadingToast('登录中')
   const res = await userLogin(account.value, password.value)
   closeToast()
   console.log(res)
+
+  userStore.login(res.data)
   router.push({ name: 'home' })
 }
 const onRegister = async () => {
-  console.log('register')
   showLoadingToast('注册中')
   await userRegister({
     email: email.value,
@@ -39,13 +48,15 @@ const onRegister = async () => {
   })
   closeToast()
   showToast('注册成功')
+  password.value = ''
+  account.value = email.value
+  loginMode.value = true
 }
 const getCaptcha = async () => {
   if (!emailReg.test(email.value)) {
     showToast('请输入正确的邮箱')
     return
   }
-  console.log('getCaptcha')
   showLoadingToast('获取验证码')
   await userCaptcha(email.value)
   closeToast()
@@ -58,13 +69,6 @@ const getCaptcha = async () => {
     }
   }, 1000)
 }
-
-const emailReg = /^[a-zA-Z0-9]+([._-][a-zA-Z0-9]+)*@[a-zA-Z0-9]+([.-][a-zA-Z0-9]+)*\.[a-zA-Z]{2,}$/
-const usernameReg = /^[a-zA-Z0-9_]{1,16}$/
-const captchaReg = /^[0-9]{6}$/
-const passwordReg = /^[a-zA-Z0-9\+\-\*\/_=\.@!#$%^&?:;,]{8,16}$/
-const alphabetReg = /[a-zA-Z]/
-const labelWidth = '64px'
 </script>
 
 <template>
@@ -140,6 +144,7 @@ const labelWidth = '64px'
       </div>
       <van-field
         v-model="password"
+        type="password"
         name="password"
         label="密码"
         placeholder="密码"
@@ -159,7 +164,10 @@ const labelWidth = '64px'
         label="确认密码"
         placeholder="确认密码"
         :label-width="labelWidth"
-        :rules="[{ required: true, message: '请确认密码' }]"
+        :rules="[
+          { required: true, message: '请确认密码' },
+          { validator: () => comfirmPassword === password, message: '与密码不一致' },
+        ]"
       />
     </van-cell-group>
     <div>
