@@ -19,13 +19,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.example.blowords.filter.JwtAuthenticationFilter;
 import com.example.blowords.handler.JwtAuthenticationEntryPoint;
+import org.springframework.security.core.userdetails.UserDetailsService;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     @Autowired
-    private UserServiceImpl userService;
+    private UserDetailsService userDetailsService;
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthFilter;
@@ -40,9 +41,10 @@ public class SecurityConfig {
     }
 
     // 认证提供者
-    @Bean
+     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userService);
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
@@ -57,28 +59,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 关闭CSRF（前后端分离不需要）
                 .csrf(csrf -> csrf.disable())
-                // 认证失败处理
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthEntryPoint))
-                // 无状态会话（JWT不需要Session）
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // 权限控制
                 .authorizeHttpRequests(auth -> auth
-                        // 允许匿名访问的接口（登录、注册、测试、接口文档）
                         .requestMatchers(
-                            "/api/auth/**", 
-                            "/api/test/**", 
+                            "/api/v1/**",
                             "/webjars/**", 
                             "/v3/**", 
                             "/swagger-resources/**"
                         ).permitAll()
-                        // 管理员接口需要ADMIN角色
                         .requestMatchers(
                             "/doc.html/**", 
                             "/api/admin/**"
                         ).hasRole("ADMIN")
-                        // 其他接口需要认证
                         .anyRequest().authenticated()
                 );
 

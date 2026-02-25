@@ -7,14 +7,14 @@ import org.springframework.stereotype.Service;
 
 import com.example.blowords.service.EmailService;
 
-import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EmailServiceImpl implements EmailService {
 
-    @Resource
+    @Autowired
     private JavaMailSender javaMailSender;
 
     // 发件人邮箱（从配置文件读取，和spring.mail.username一致）

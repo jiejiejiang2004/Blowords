@@ -11,6 +11,9 @@ import java.util.Map;
 import com.example.blowords.exception.BusinessException;
 import com.example.blowords.exception.UserExistsException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * 全局异常处理器
  * 捕获并处理系统中的各类异常，返回统一格式的错误响应
@@ -45,6 +48,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
         Map<String, Object> response = new HashMap<>();
+        Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        logger.error("运行时异常：", ex);
         response.put("code", 500);
         response.put("message", "服务器内部错误：" + ex.getMessage());
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR); // 500 状态码

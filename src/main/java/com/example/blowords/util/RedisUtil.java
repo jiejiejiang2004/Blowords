@@ -54,4 +54,9 @@ public class RedisUtil {
     public boolean exists(String key) {
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
+
+    public boolean verifyRegisterCaptcha(String email, String captcha) {
+        String storedCaptcha = get("email:captcha:" + email);
+        return storedCaptcha != null && storedCaptcha.equals(captcha);
+    }
 }
