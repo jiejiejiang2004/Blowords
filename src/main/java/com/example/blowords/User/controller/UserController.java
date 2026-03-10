@@ -4,7 +4,11 @@ package com.example.blowords.User.controller;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.example.blowords.User.dto.UserAccountUpdateDTO;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.example.blowords.Email.service.EmailService;
+import com.example.blowords.User.dto.*;
+import com.example.blowords.User.mapper.UserMapper;
+import com.example.blowords.common.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,11 +25,6 @@ import com.example.blowords.common.response.ApiResponse;
 import com.example.blowords.common.response.LoginResponse;
 import com.example.blowords.User.entity.User;
 import com.example.blowords.User.service.UserService;
-import com.example.blowords.common.util.JwtUtil;
-import com.example.blowords.common.util.RedisUtil;
-import com.example.blowords.common.util.ValidationUtil;
-import com.example.blowords.common.util.VerifyCodeUtil;
-import com.example.blowords.User.dto.UserAccountDTO;
 
 /**
  * <p>
@@ -42,17 +41,19 @@ public class UserController {
 
     private final UserService userService;
 
-    // @Autowired
+    @Autowired
     private final JwtUtil jwtUtil;
     // private final ValidationUtil validationUtil;
     private final RedisUtil redisUtil;
+    private final UserMapper userMapper;
 
     @Autowired
-    public UserController(JwtUtil jwtUtil, UserService userService, RedisUtil redisUtil) {
+    public UserController(JwtUtil jwtUtil, UserService userService, RedisUtil redisUtil, UserMapper userMapper) {
         this.jwtUtil = jwtUtil;
         this.userService = userService;
         // this.validationUtil = new ValidationUtil();
         this.redisUtil = redisUtil;
+        this.userMapper = userMapper;
     }
 
     @PostMapping("/registerCaptcha")
@@ -69,9 +70,7 @@ public class UserController {
 
         String captcha = VerifyCodeUtil.generateCode(6);
 
-        String result = userService.sendRegisterCaptcha(email, captcha);
-
-        return switch (result) {
+        return switch (userService.sendRegisterCaptcha(email, captcha)) {
             case "200" -> ResponseEntity.status(HttpStatus.OK)
                     .body(ApiResponse.success("验证码发送成功"));
             case "422" -> ResponseEntity.badRequest()
@@ -84,7 +83,7 @@ public class UserController {
                 User user = userService.getUserByEmail(email);
                 response.put("user", user);
                 yield ResponseEntity.status(HttpStatus.CONFLICT)
-                        .body(ApiResponse.error(409, "邮箱已注册", response));
+                        .body(ApiResponse.error(400, "未知错误", response));
             }
         };
     }
@@ -184,10 +183,78 @@ public class UserController {
     @PatchMapping("/me/account")
     public ResponseEntity<ApiResponse<?>> updateAccountInfo(
             @AuthenticationPrincipal UserDetails userDetails,
-            @Validated @RequestBody UserAccountUpdateDTO updateDTO) { // @Validated校验参数
-
-        // 调用Service更新（用户名从Token中获取，避免前端传参篡改）
+            @Validated @RequestBody UserAccountUpdateDTO updateDTO) {
         UserAccountDTO updatedAccount = userService.updateAccount(userDetails.getUsername(), updateDTO);
         return ResponseEntity.ok(ApiResponse.success(updatedAccount));
+    }
+
+    @PutMapping("/me/password")
+    public ResponseEntity<ApiResponse<?>> updatePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Validated @RequestBody UserPasswordUpdateDTO updateDTO) {
+        userService.updatePassword(userDetails.getUsername(), updateDTO);
+
+        // redis token 失效
+        redisUtil.del("accessToken:" + userDetails.getUsername());
+        redisUtil.del("refreshToken:" + userDetails.getUsername());
+
+        return ResponseEntity.ok(ApiResponse.success("密码更新成功"));
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<ApiResponse<?>> resetPassword(
+            @Validated @RequestBody UserPasswordResetDTO resetDTO
+    ) {
+        String email = resetDTO.getEmail();
+        String username = resetDTO.getUsername();
+
+        User user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
+        if(!email.equals(user.getEmail())) {
+            throw new IllegalArgumentException("用户名与邮箱不匹配");
+        }
+
+        String resetCaptcha = resetDTO.getCaptcha();
+        if(!redisUtil.verifyResetPasswordCaptcha(email, resetCaptcha)) {
+            throw new IllegalArgumentException("验证码错误");
+        }
+
+        userService.SetPassword(username, resetDTO.getNewPassword());
+
+        // redis token 失效
+        redisUtil.del("accessToken:" + username);
+        redisUtil.del("refreshToken:" + username);
+
+        return ResponseEntity.ok(ApiResponse.success("密码重置成功"));
+    }
+
+    @PostMapping("/password/resetCaptcha")
+    public ResponseEntity<ApiResponse<?>> sendResetCaptcha(
+            @Validated @RequestBody UserPasswordResetCaptchaDTO captchaDTO
+    ) {
+        String email = captchaDTO.getEmail();
+        String captcha = VerifyCodeUtil.generateCode(6);
+
+        switch(userService.sendResetPasswordCode(email, captcha)) {
+            case "200" -> {
+                return ResponseEntity.status(HttpStatus.OK)
+                        .body(ApiResponse.success("验证码发送成功"));
+            }
+            case "422" -> {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error(422, "验证码发送失败或请求频繁"));
+            }
+            case "429" -> {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(ApiResponse.error(429, "请求频繁，请稍后再试"));
+            }
+            case "409" -> {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(ApiResponse.error(409, "邮箱未注册"));
+            }
+            default -> {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(ApiResponse.error(400, "未知错误"));
+            }
+        }
     }
 }

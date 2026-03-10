@@ -4,6 +4,8 @@ import com.example.blowords.User.dto.UserAccountDTO;
 import com.example.blowords.User.dto.UserAccountUpdateDTO;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.example.blowords.User.dto.UserPasswordResetDTO;
+import com.example.blowords.User.dto.UserPasswordUpdateDTO;
 import com.example.blowords.User.entity.User;
 
 /**
@@ -29,4 +31,10 @@ public interface UserService extends IService<User> {
     public UserAccountDTO getAccountByUsername(String username);
 
     public UserAccountDTO updateAccount(String username, UserAccountUpdateDTO updateDTO);
+
+    public void updatePassword(String username, UserPasswordUpdateDTO updateDTO);
+
+    public void SetPassword(String username, String password);
+
+    public String sendResetPasswordCode(String email, String captcha);
 }

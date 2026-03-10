@@ -16,9 +16,9 @@ public class EmailTemplateLoader {
         this.resourceLoader = resourceLoader;
     }
 
-    public String getVerifyCodeTemplate(String code) throws Exception {
+    public String getVerifyCodeTemplate(String templateName, String code) throws Exception {
         // 加载templates/email/verify_code.html文件
-        Resource resource = resourceLoader.getResource("classpath:templates/email/verify_code.html");
+        Resource resource = resourceLoader.getResource("classpath:templates/email/" + templateName + ".html");
         // 读取文件内容（指定UTF-8编码，避免中文乱码）
         String templateContent = new String(Files.readAllBytes(resource.getFile().toPath()), StandardCharsets.UTF_8);
         // 替换模板中的${code}为实际验证码

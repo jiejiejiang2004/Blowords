@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.example.blowords.User.dto.UserAccountUpdateDTO;
+import com.example.blowords.User.dto.UserPasswordResetDTO;
+import com.example.blowords.User.dto.UserPasswordUpdateDTO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -48,7 +50,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public UserAccountDTO getAccountByUsername(String username) throws UsernameNotFoundException {
 
-        if(!isUserExist(username)) {
+        if (!isUserExist(username)) {
             throw new UsernameNotFoundException("用户不存在");
         }
 
@@ -68,7 +70,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (baseMapper.selectOne(new QueryWrapper<User>().eq("username", username)) != null) {
             throw new IllegalArgumentException("用户名已存在");
         }
-        
+
         // 检查邮箱是否已存在
         if (baseMapper.selectOne(new QueryWrapper<User>().eq("email", email)) != null) {
             throw new IllegalArgumentException("邮箱已存在");
@@ -78,21 +80,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new IllegalArgumentException("手机号已存在");
         }
 
-        if(!redisUtil.verifyRegisterCaptcha(email, registerCaptcha)) {
+        if (!redisUtil.verifyRegisterCaptcha(email, registerCaptcha)) {
             throw new IllegalArgumentException("验证码错误");
         }
 
         password = PasswordEncryptUtil.encrypt(password);
 
         // 创建新用户
-        User user = new User(username, password, email, telephone, "USER", LocalDateTime.now(), null,  DEFAULT_AVATAR_DIR);
-        
+        User user = new User(username, password, email, telephone, "USER", LocalDateTime.now(), null, DEFAULT_AVATAR_DIR);
+
         // 保存用户到数据库
         baseMapper.insert(user);
 
         String UserID = baseMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getUserid().toString();
         user.setUserid(Integer.parseInt(UserID));
-        
+
         return user;
     }
 
@@ -107,33 +109,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new IllegalArgumentException("邮箱已存在");
         }
 
-        if(!redisUtil.get("email:captcha:" + email).equals(registerCaptcha)) {
+        if (!redisUtil.verifyRegisterCaptcha(email, registerCaptcha)) {
             throw new IllegalArgumentException("验证码错误");
         }
 
         password = PasswordEncryptUtil.encrypt(password);
 
-        User user = new User(username, password, email, null, "USER", LocalDateTime.now(), null,  DEFAULT_AVATAR_DIR);
-        
+        User user = new User(username, password, email, null, "USER", LocalDateTime.now(), null, DEFAULT_AVATAR_DIR);
+
         baseMapper.insert(user);
 
         String UserID = baseMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getUserid().toString();
         user.setUserid(Integer.parseInt(UserID));
-        
+
         return user;
     }
 
     @Override
     public String sendRegisterCaptcha(String email, String captcha) {
-
         if (!ValidationUtil.isValidEmail(email)) {
             return "422"; // 422 - 邮箱格式不正确或不存在
         }
 
-        System.out.println("emall:" + email);
-        
         try {
-            User existingUser = baseMapper.selectOne(new QueryWrapper<User>().eq("email", email));
+            User existingUser = userMapper.selectOne(new QueryWrapper<User>().eq("email", email));
             if (existingUser != null && existingUser.getEmail().equals(email)) {
                 return "409"; // 409 - 邮箱已注册
             }
@@ -141,49 +140,42 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             e.printStackTrace();
             return "500"; // 500 - 服务器内部错误
         }
-        
-        String redisKey = "email:captcha:" + email;
+
+        String redisKey = "email:registerCaptcha:" + email;
         try {
             if (redisUtil.exists(redisKey)) {
                 return "429"; // 429 - 请求频繁
             }
-            
-            emailService.sendRegisterVerifyCode(email, captcha);
-            
-            redisUtil.set(redisKey, captcha, 300);
 
-            if(!redisUtil.exists(redisKey)) {
-                return "400"; // 429 - 请求频繁
-            }
-            
+            emailService.sendRegisterVerifyCode(email, captcha);
+            redisUtil.set(redisKey, captcha, 300);
         } catch (Exception e) {
             e.printStackTrace();
             return "400"; // 422 - 发送失败或请求频繁
         }
-        
         return "200"; // 200 - 发送成功
     }
 
     @Override
     public User login(String account, String password) {
         User user = null;
-        
-        if(validationUtil.isValidEmail(account)) {
+
+        if (validationUtil.isValidEmail(account)) {
             user = baseMapper.selectOne(new QueryWrapper<User>().eq("email", account));
-        } else if(validationUtil.isPhoneNumberValid(account)) {
+        } else if (validationUtil.isPhoneNumberValid(account)) {
             user = baseMapper.selectOne(new QueryWrapper<User>().eq("telephone", account));
         } else {
             user = baseMapper.selectOne(new QueryWrapper<User>().eq("username", account));
         }
-        
+
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }
-        
+
         if (!PasswordEncryptUtil.matches(password, user.getPassword())) {
             throw new RuntimeException("密码错误");
         }
-        
+
         return user;
     }
 
@@ -231,5 +223,58 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return userMapper.selectOne(new QueryWrapper<User>().eq("username", account)
                 .or().eq("email", account)
                 .or().eq("telephone", account)) != null;
+    }
+
+    @Override
+    public void updatePassword(String username, UserPasswordUpdateDTO updateDTO) {
+        if (!isUserExist(username)) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        User user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
+
+        if (!PasswordEncryptUtil.matches(updateDTO.getOldPassword(), user.getPassword())) {
+            throw new RuntimeException("旧密码错误");
+        }
+
+        SetPassword(username, updateDTO.getNewPassword());
+    }
+
+    @Override
+    public void SetPassword(String username, String password) {
+        String encryptedPassword = PasswordEncryptUtil.encrypt(password);
+        UpdateWrapper<User> updateWrapper = new UpdateWrapper<User>().eq("username", username);
+        updateWrapper.set("password", encryptedPassword);
+        userMapper.update(null, updateWrapper);
+    }
+
+    @Override
+    public String sendResetPasswordCode(String email, String captcha) {
+        if (!ValidationUtil.isValidEmail(email)) {
+            return "422"; // 422 - 邮箱格式不正确或不存在
+        }
+
+        try {
+            User existingUser = userMapper.selectOne(new QueryWrapper<User>().eq("email", email));
+            if (existingUser == null) {
+                return "409"; // 409 - 邮箱未注册
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "500"; // 500 - 服务器内部错误
+        }
+
+        String redisKey = "email:resetPasswordCaptcha:" + email;
+        try {
+            if (redisUtil.exists(redisKey)) {
+                return "429"; // 429 - 请求频繁
+            }
+            emailService.sendResetPasswordCode(email, captcha);
+            redisUtil.set(redisKey, captcha, 300);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "400"; // 422 - 发送失败或请求频繁
+        }
+        return "200"; // 200 - 发送成功
     }
 }

@@ -83,7 +83,9 @@ public class SecurityConfig {
                             "/api/v1/users/login",
                             "/api/v1/users/register",
                             "/api/v1/users/registerCaptcha",
-                            "/api/v1/avatar/getavatar/**"
+                            "/api/v1/avatar/getavatar/**",
+                            "/api/v1/users/password/reset",
+                            "/api/v1/users/password/resetCaptcha"
 //                            "/webjars/**",
 //                            "/v3/**",
 //                            "/swagger-resources/**"

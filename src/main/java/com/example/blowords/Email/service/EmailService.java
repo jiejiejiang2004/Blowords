@@ -7,5 +7,7 @@ public interface EmailService {
      * @param code 验证码
      * @return 是否发送成功
      */
-    boolean sendRegisterVerifyCode(String to, String code);
+    public boolean sendRegisterVerifyCode(String to, String code);
+
+    public boolean sendResetPasswordCode(String to, String code);
 }
