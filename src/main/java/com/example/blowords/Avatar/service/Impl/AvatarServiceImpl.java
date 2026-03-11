@@ -1,9 +1,12 @@
-package com.example.blowords.Avatar.controller.service.Impl;
+package com.example.blowords.Avatar.service.Impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.example.blowords.Avatar.controller.service.AvatarService;
+import com.example.blowords.Avatar.service.AvatarService;
 import com.example.blowords.User.entity.User;
 import com.example.blowords.User.mapper.UserMapper;
+import com.example.blowords.common.exception.ResourceNotFoundException.AvatarNotFoundException;
+import com.example.blowords.common.exception.ResourceNotFoundException.UserNotFoundException;
+import com.example.blowords.common.exception.InternalServerErrorException.UpdateAvatarFailException;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -36,12 +39,12 @@ public class AvatarServiceImpl implements AvatarService {
         try {
             User user = userMapper.selectOne(new QueryWrapper<User>().eq("userid", userId));
             if (user == null) {
-                throw new IllegalArgumentException("用户不存在");
+                throw new UserNotFoundException("用户不存在");
             }
             user.setAvatarUrl(uniqueFilename);
             userMapper.updateById(user);
         } catch (Exception e) {
-            throw new RuntimeException("更新用户头像失败", e);
+            throw new UpdateAvatarFailException("更新用户头像失败");
         }
     }
 
@@ -49,12 +52,12 @@ public class AvatarServiceImpl implements AvatarService {
     public byte[] getAvatar(String userId) {
         User user = userMapper.selectOne(new QueryWrapper<User>().eq("userid", userId));
         if (user == null) {
-            throw new IllegalArgumentException("用户不存在");
+            throw new UserNotFoundException("用户不存在");
         }
 
         String Filename = user.getAvatarUrl();
         if (Filename == null) {
-            throw new IllegalArgumentException("用户头像不存在");
+            throw new AvatarNotFoundException("用户头像不存在");
         }
 
         try {
@@ -65,5 +68,18 @@ public class AvatarServiceImpl implements AvatarService {
         }
     }
 
+    @Override
+    public String getAvatarUrl(String userId) {
+        User user = userMapper.selectOne(new QueryWrapper<User>().eq("userid", userId));
+        if (user == null) {
+            throw new UserNotFoundException("用户不存在");
+        }
 
+        String avatarUrl = user.getAvatarUrl();
+        if (avatarUrl == null) {
+            throw new AvatarNotFoundException("用户头像不存在");
+        }
+
+        return avatarUrl;
+    }
 }

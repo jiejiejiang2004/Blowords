@@ -10,4 +10,8 @@ public interface EmailService {
     public boolean sendRegisterVerifyCode(String to, String code);
 
     public boolean sendResetPasswordCode(String to, String code);
+
+    public boolean isEmailExists(String email);
+
+    public boolean sendEmail(String to, String code, String type);
 }

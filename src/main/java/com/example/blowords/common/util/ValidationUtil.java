@@ -3,6 +3,9 @@ package com.example.blowords.common.util;
 import java.io.File;
 import java.util.regex.Pattern;
 
+import com.example.blowords.common.exception.ContentTooLargeException.FileTooLargeException;
+import com.example.blowords.common.exception.IllegalParameterException.EmptyFileException;
+import com.example.blowords.common.exception.IllegalParameterException.IllegalFileExtentionException;
 import com.example.blowords.common.response.ApiResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.ResponseEntity;
@@ -123,19 +126,19 @@ public class ValidationUtil {
      * @param file 待校验的头像文件
      * @return 校验结果信息（通过或具体错误信息）
      */
-    public static String isAvatarFileValid(MultipartFile file) {
+    public static boolean isAvatarFileValid(MultipartFile file) {
         if(isFileEmpty(file)) {
-            return "文件不能为空";
+            throw new EmptyFileException("文件不能为空");
         }
 
         if(isFileSizeValid(file, MAX_AVATAR_FILE_SIZE)) {
-            return "文件大小不能超过5MB";
+            throw new FileTooLargeException("文件大小不能超过5MB");
         }
 
         if(!isFileExtensionValid(file.getOriginalFilename(), ALLOWED_EXTENSIONS)) {
-            return "只支持jpg、jpeg、png、gif格式的图片";
+            throw new IllegalFileExtentionException("只支持jpg、jpeg、png、gif格式的图片");
         }
 
-        return "文件校验通过";
+        return true;
     }
 }

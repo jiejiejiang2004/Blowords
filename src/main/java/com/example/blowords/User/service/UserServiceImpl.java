@@ -3,9 +3,21 @@ package com.example.blowords.User.service;
 import java.time.LocalDateTime;
 
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.example.blowords.User.controller.UserController;
 import com.example.blowords.User.dto.UserAccountUpdateDTO;
-import com.example.blowords.User.dto.UserPasswordResetDTO;
 import com.example.blowords.User.dto.UserPasswordUpdateDTO;
+import com.example.blowords.common.exception.CaptchaWrongException;
+import com.example.blowords.common.exception.IllegalParameterException.IllegalEmailFormulaException;
+import com.example.blowords.common.exception.IllegalParameterException.PasswordEqualException;
+import com.example.blowords.common.exception.InternalServerErrorException.InternalServerErrorException;
+import com.example.blowords.common.exception.ResourceConflictException.EmailExistException;
+import com.example.blowords.common.exception.ResourceConflictException.TelephoneExistException;
+import com.example.blowords.common.exception.ResourceConflictException.UserExistsException;
+import com.example.blowords.common.exception.ResourceConflictException.UsernameExistException;
+import com.example.blowords.common.exception.ResourceNotFoundException.EmailNotFoundException;
+import com.example.blowords.common.exception.TooManyRequestException.GetTooManyCaptchaException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -46,6 +58,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     private static final String AVATAR_DIR = "/api/v1/avatar/getavatar/";
+    private static final String DEFAULT_AVATAR_DIR = "000.jpg";
 
     @Override
     public UserAccountDTO getAccountByUsername(String username) throws UsernameNotFoundException {
@@ -62,26 +75,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return dto;
     }
 
-    private static final String DEFAULT_AVATAR_DIR = "000.jpg";
-
     @Override
     public User register(String username, String password, String email, String telephone, String registerCaptcha) {
         // 检查用户名是否已存在
-        if (baseMapper.selectOne(new QueryWrapper<User>().eq("username", username)) != null) {
-            throw new IllegalArgumentException("用户名已存在");
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("username", username)) != null) {
+            throw new UserExistsException("用户名已存在");
         }
 
         // 检查邮箱是否已存在
-        if (baseMapper.selectOne(new QueryWrapper<User>().eq("email", email)) != null) {
-            throw new IllegalArgumentException("邮箱已存在");
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("email", email)) != null) {
+            throw new EmailExistException("邮箱已存在");
         }
 
-        if (baseMapper.selectOne(new QueryWrapper<User>().eq("telephone", telephone)) != null) {
-            throw new IllegalArgumentException("手机号已存在");
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("telephone", telephone)) != null) {
+            throw new TelephoneExistException("手机号已存在");
         }
 
         if (!redisUtil.verifyRegisterCaptcha(email, registerCaptcha)) {
-            throw new IllegalArgumentException("验证码错误");
+            throw new CaptchaWrongException("验证码错误");
         }
 
         password = PasswordEncryptUtil.encrypt(password);
@@ -90,9 +101,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         User user = new User(username, password, email, telephone, "USER", LocalDateTime.now(), null, DEFAULT_AVATAR_DIR);
 
         // 保存用户到数据库
-        baseMapper.insert(user);
+        userMapper.insert(user);
 
-        String UserID = baseMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getUserid().toString();
+        String UserID = userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getUserid().toString();
         user.setUserid(Integer.parseInt(UserID));
 
         return user;
@@ -101,59 +112,66 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public User register(String username, String password, String email, String registerCaptcha) {
 
-        if (baseMapper.selectOne(new QueryWrapper<User>().eq("username", username)) != null) {
-            throw new IllegalArgumentException("用户名已存在");
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("username", username)) != null) {
+            throw new UsernameExistException("用户名已存在");
         }
 
-        if (baseMapper.selectOne(new QueryWrapper<User>().eq("email", email)) != null) {
-            throw new IllegalArgumentException("邮箱已存在");
+        if (userMapper.selectOne(new QueryWrapper<User>().eq("email", email)) != null) {
+            throw new EmailExistException("邮箱已存在");
         }
 
         if (!redisUtil.verifyRegisterCaptcha(email, registerCaptcha)) {
-            throw new IllegalArgumentException("验证码错误");
+            throw new CaptchaWrongException("验证码错误");
         }
 
         password = PasswordEncryptUtil.encrypt(password);
 
         User user = new User(username, password, email, null, "USER", LocalDateTime.now(), null, DEFAULT_AVATAR_DIR);
 
-        baseMapper.insert(user);
+        userMapper.insert(user);
 
-        String UserID = baseMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getUserid().toString();
+        String UserID = userMapper.selectOne(new QueryWrapper<User>().eq("username", username)).getUserid().toString();
         user.setUserid(Integer.parseInt(UserID));
 
         return user;
     }
 
     @Override
-    public String sendRegisterCaptcha(String email, String captcha) {
+    public boolean sendRegisterCaptcha(String email, String captcha) {
         if (!ValidationUtil.isValidEmail(email)) {
-            return "422"; // 422 - 邮箱格式不正确或不存在
+            throw new IllegalEmailFormulaException("邮箱格式错误");
+        }
+
+        if (!emailService.isEmailExists(email)) {
+            throw new EmailNotFoundException("邮箱不存在");
         }
 
         try {
             User existingUser = userMapper.selectOne(new QueryWrapper<User>().eq("email", email));
             if (existingUser != null && existingUser.getEmail().equals(email)) {
-                return "409"; // 409 - 邮箱已注册
+                throw new IllegalEmailFormulaException("邮箱已注册");
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            return "500"; // 500 - 服务器内部错误
+            Logger logger = LoggerFactory.getLogger(UserController.class);
+            logger.error("注册异常：", e);
+            throw new InternalServerErrorException(/*e.getMessage()*/"未知异常,注册失败");
         }
 
         String redisKey = "email:registerCaptcha:" + email;
         try {
             if (redisUtil.exists(redisKey)) {
-                return "429"; // 429 - 请求频繁
+                throw new GetTooManyCaptchaException("请求频繁,请稍后再试");
             }
 
-            emailService.sendRegisterVerifyCode(email, captcha);
+            emailService.sendEmail(email, captcha, "Blowords注册验证码");
             redisUtil.set(redisKey, captcha, 300);
         } catch (Exception e) {
             e.printStackTrace();
-            return "400"; // 422 - 发送失败或请求频繁
+            Logger logger = LoggerFactory.getLogger(UserController.class);
+            logger.error("注册异常：", e);
+            throw new InternalServerErrorException(/*e.getMessage()*/"未知异常,注册失败");
         }
-        return "200"; // 200 - 发送成功
+        return true;
     }
 
     @Override
@@ -228,13 +246,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public void updatePassword(String username, UserPasswordUpdateDTO updateDTO) {
         if (!isUserExist(username)) {
-            throw new RuntimeException("用户不存在");
+            throw new UserExistsException("用户不存在");
         }
 
         User user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
 
         if (!PasswordEncryptUtil.matches(updateDTO.getOldPassword(), user.getPassword())) {
-            throw new RuntimeException("旧密码错误");
+            throw new PasswordEqualException("旧密码错误");
+        }
+
+        if (updateDTO.getOldPassword().equals(updateDTO.getNewPassword())) {
+            throw new PasswordEqualException("新密码不能与旧密码相同");
         }
 
         SetPassword(username, updateDTO.getNewPassword());
@@ -249,32 +271,36 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public String sendResetPasswordCode(String email, String captcha) {
+    public boolean sendResetPasswordCode(String email, String captcha) {
         if (!ValidationUtil.isValidEmail(email)) {
-            return "422"; // 422 - 邮箱格式不正确或不存在
+            throw new IllegalEmailFormulaException("邮箱格式错误");
+        }
+
+        if (!emailService.isEmailExists(email)) {
+            throw new IllegalEmailFormulaException("邮箱不存在");
         }
 
         try {
             User existingUser = userMapper.selectOne(new QueryWrapper<User>().eq("email", email));
             if (existingUser == null) {
-                return "409"; // 409 - 邮箱未注册
+                throw new EmailNotFoundException("邮箱未注册");
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return "500"; // 500 - 服务器内部错误
+            throw new InternalServerErrorException("未知错误, 检查邮箱是否注册");
         }
 
         String redisKey = "email:resetPasswordCaptcha:" + email;
         try {
             if (redisUtil.exists(redisKey)) {
-                return "429"; // 429 - 请求频繁
+                throw new GetTooManyCaptchaException("获取验证码过于频繁, 请稍后再试");
             }
-            emailService.sendResetPasswordCode(email, captcha);
+            emailService.sendEmail(email, captcha, "Blowords密码重置验证码");
             redisUtil.set(redisKey, captcha, 300);
         } catch (Exception e) {
             e.printStackTrace();
-            return "400"; // 422 - 发送失败或请求频繁
+            throw new InternalServerErrorException("未知错误, 发送密码重置验证码失败");
         }
-        return "200"; // 200 - 发送成功
+        return true; // 200 - 发送成功
     }
 }

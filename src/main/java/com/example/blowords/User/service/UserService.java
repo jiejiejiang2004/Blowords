@@ -22,7 +22,7 @@ public interface UserService extends IService<User> {
 
     public User register(String username, String password, String email, String telephone, String registerCaptcha);
 
-    public String sendRegisterCaptcha(String email, String captcha);
+    public boolean sendRegisterCaptcha(String email, String captcha);
 
     public User login(String account, String password);
 
@@ -36,5 +36,5 @@ public interface UserService extends IService<User> {
 
     public void SetPassword(String username, String password);
 
-    public String sendResetPasswordCode(String email, String captcha);
+    public boolean sendResetPasswordCode(String email, String captcha);
 }

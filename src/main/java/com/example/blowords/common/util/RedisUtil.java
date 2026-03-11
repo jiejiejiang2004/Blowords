@@ -807,6 +807,12 @@ public class RedisUtil {
         return storedCaptcha != null && storedCaptcha.equals(captcha);
     }
 
+    /**
+     * 验证重设密码验证码
+     * @param email 邮箱
+     * @param captcha 验证码
+     * @return 是否验证通过
+     */
     public boolean verifyResetPasswordCaptcha(String email, String captcha) {
         String storedCaptcha = get("email:resetPasswordCaptcha:" + email);
         return storedCaptcha != null && storedCaptcha.equals(captcha);

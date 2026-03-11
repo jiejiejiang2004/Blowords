@@ -2,7 +2,7 @@ package com.example.blowords.User.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.blowords.User.entity.User;
-import com.example.blowords.common.exception.UsernameNotFoundException;
+import com.example.blowords.common.exception.ResourceNotFoundException.UserNotFoundException;
 import com.example.blowords.User.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,11 +17,11 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     // 固定方法：根据用户名加载认证信息，仅此一个方法
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String username) throws UserNotFoundException {
         // 1. 从数据库查用户（只查认证必要字段：用户名、密码、权限）
         User user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
         if (user == null) {
-            throw new UsernameNotFoundException("用户不存在：" + username);
+            throw new UserNotFoundException("用户不存在：" + username);
         }
 
         // 2. 封装成 Spring Security 要求的 UserDetails（只包含认证信息）

@@ -5,9 +5,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.example.blowords.Email.service.EmailService;
 import com.example.blowords.User.dto.*;
 import com.example.blowords.User.mapper.UserMapper;
+import com.example.blowords.common.exception.CaptchaWrongException;
+import com.example.blowords.common.exception.IllegalParameterException.IllegalEmailFormulaException;
+import com.example.blowords.common.exception.IllegalParameterException.IllegalParameterException;
+import com.example.blowords.common.exception.InternalServerErrorException.CaptchaSendFailException;
+import com.example.blowords.common.exception.InternalServerErrorException.InternalServerErrorException;
+import com.example.blowords.common.exception.ResourceNotFoundException.UserNotFoundException;
 import com.example.blowords.common.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -70,40 +75,27 @@ public class UserController {
 
         String captcha = VerifyCodeUtil.generateCode(6);
 
-        return switch (userService.sendRegisterCaptcha(email, captcha)) {
-            case "200" -> ResponseEntity.status(HttpStatus.OK)
+        if(userService.sendRegisterCaptcha(email, captcha)) {
+            return ResponseEntity.status(HttpStatus.OK)
                     .body(ApiResponse.success("验证码发送成功"));
-            case "422" -> ResponseEntity.badRequest()
-                    .body(ApiResponse.error(422, "验证码发送失败或请求频繁", response));
-            case "429" -> ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(ApiResponse.error(429, "请求频繁，请稍后再试", response));
-            case "409" -> ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponse.error(409, "邮箱已注册", response));
-            default -> {
-                User user = userService.getUserByEmail(email);
-                response.put("user", user);
-                yield ResponseEntity.status(HttpStatus.CONFLICT)
-                        .body(ApiResponse.error(400, "未知错误", response));
-            }
-        };
+        } else {
+            throw new CaptchaSendFailException("验证码发送失败，请稍后重试");
+        }
     }
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<?>> register(@RequestBody Map<String, String> registerRequest) {
-        String username = registerRequest.get("username");
-        String password = registerRequest.get("password");
-        String email = registerRequest.get("email");
-        String telephone = registerRequest.get("telephone");
-        String registerCaptcha = registerRequest.get("captcha");
-
-        if (username == null || password == null || email == null) {
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error(400, "请求参数不完整"));
+    public ResponseEntity<ApiResponse<?>> register(@RequestBody UserRegisterDTO userRegisterDTO) {
+        String username = userRegisterDTO.getUsername();
+        String password = userRegisterDTO.getPassword();
+        String email = userRegisterDTO.getEmail();
+        String telephone = userRegisterDTO.getTelephone();
+        String registerCaptcha = userRegisterDTO.getCaptcha();
+        if (username == null || password == null || email == null || registerCaptcha == null) {
+            throw new IllegalParameterException("请求参数不完整");
         }
 
         if (!ValidationUtil.isValidEmail(email)) {
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error(422, "邮箱格式错误"));
+            throw new IllegalEmailFormulaException("邮箱格式错误");
         }
 
         try {
@@ -112,14 +104,19 @@ public class UserController {
             } else {
                 userService.register(username, password, email, telephone, registerCaptcha);
             }
-            
+
+            Map<String, String> response = new HashMap<>();
+            response.put("username", username);
+            response.put("email", email);
+            response.put("telephone", telephone);
+            response.put("password", password);
+
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponse.success("注册成功"));
+                    .body(ApiResponse.success("注册成功", response));
         } catch (Exception e) {
             Logger logger = LoggerFactory.getLogger(UserController.class);
             logger.error("注册异常：", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error(e.getMessage()+"666何意味"));
+            throw new InternalServerErrorException(/*e.getMessage()*/"未知异常,注册失败");
         }
     }
     
@@ -158,16 +155,12 @@ public class UserController {
                 return ResponseEntity.status(HttpStatus.OK)
                         .body(ApiResponse.success("登录成功", response, false));
             } else {
-                // 登录失败
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error(401, "登录失败"));
+                throw new UserNotFoundException("用户不存在");
             }
         } catch (Exception e) {
-            // 处理异常，返回错误响应
-             Logger logger = LoggerFactory.getLogger(UserController.class);
+            Logger logger = LoggerFactory.getLogger(UserController.class);
             logger.error("登录异常：", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error(e.getMessage()));
+            throw new InternalServerErrorException("未知异常,登录失败");
         }
     }
 
@@ -184,7 +177,17 @@ public class UserController {
     public ResponseEntity<ApiResponse<?>> updateAccountInfo(
             @AuthenticationPrincipal UserDetails userDetails,
             @Validated @RequestBody UserAccountUpdateDTO updateDTO) {
-        UserAccountDTO updatedAccount = userService.updateAccount(userDetails.getUsername(), updateDTO);
+
+        String username;
+        try{
+            username = userDetails.getUsername();
+        } catch (UserNotFoundException e) {
+            Logger logger = LoggerFactory.getLogger(UserController.class);
+            logger.error("更新账户信息异常：", e);
+            throw new UserNotFoundException("用户不存在");
+        }
+
+        UserAccountDTO updatedAccount = userService.updateAccount(username, updateDTO);
         return ResponseEntity.ok(ApiResponse.success(updatedAccount));
     }
 
@@ -192,13 +195,27 @@ public class UserController {
     public ResponseEntity<ApiResponse<?>> updatePassword(
             @AuthenticationPrincipal UserDetails userDetails,
             @Validated @RequestBody UserPasswordUpdateDTO updateDTO) {
-        userService.updatePassword(userDetails.getUsername(), updateDTO);
+
+        String username;
+        try{
+            username = userDetails.getUsername();
+        } catch (UserNotFoundException e) {
+            Logger logger = LoggerFactory.getLogger(UserController.class);
+            logger.error("更新账户信息异常：", e);
+            throw new UserNotFoundException("用户不存在");
+        }
+
+        userService.updatePassword(username, updateDTO);
 
         // redis token 失效
         redisUtil.del("accessToken:" + userDetails.getUsername());
         redisUtil.del("refreshToken:" + userDetails.getUsername());
 
-        return ResponseEntity.ok(ApiResponse.success("密码更新成功"));
+        Map<String, String> response = new HashMap<>();
+        response.put("oldPassword", updateDTO.getOldPassword());
+        response.put("newPassword", updateDTO.getNewPassword());
+
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping("/password/reset")
@@ -215,7 +232,7 @@ public class UserController {
 
         String resetCaptcha = resetDTO.getCaptcha();
         if(!redisUtil.verifyResetPasswordCaptcha(email, resetCaptcha)) {
-            throw new IllegalArgumentException("验证码错误");
+            throw new CaptchaWrongException("验证码错误");
         }
 
         userService.SetPassword(username, resetDTO.getNewPassword());
@@ -234,27 +251,11 @@ public class UserController {
         String email = captchaDTO.getEmail();
         String captcha = VerifyCodeUtil.generateCode(6);
 
-        switch(userService.sendResetPasswordCode(email, captcha)) {
-            case "200" -> {
-                return ResponseEntity.status(HttpStatus.OK)
-                        .body(ApiResponse.success("验证码发送成功"));
-            }
-            case "422" -> {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error(422, "验证码发送失败或请求频繁"));
-            }
-            case "429" -> {
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body(ApiResponse.error(429, "请求频繁，请稍后再试"));
-            }
-            case "409" -> {
-                return ResponseEntity.status(HttpStatus.CONFLICT)
-                        .body(ApiResponse.error(409, "邮箱未注册"));
-            }
-            default -> {
-                return ResponseEntity.status(HttpStatus.CONFLICT)
-                        .body(ApiResponse.error(400, "未知错误"));
-            }
+        if(userService.sendResetPasswordCode(email, captcha)) {
+            return ResponseEntity.status(HttpStatus.OK)
+                    .body(ApiResponse.success("验证码发送成功"));
+        } else {
+            throw new InternalServerErrorException("未知错误, 发送密码重置验证码失败");
         }
     }
 }
