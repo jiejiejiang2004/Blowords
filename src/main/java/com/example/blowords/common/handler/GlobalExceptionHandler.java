@@ -4,6 +4,7 @@ import com.example.blowords.common.exception.IllegalParameterException.IllegalPa
 import com.example.blowords.common.exception.InternalServerErrorException.InternalServerErrorException;
 import com.example.blowords.common.exception.ResourceConflictException.ResourceConflictException;
 import com.example.blowords.common.exception.ResourceNotFoundException.ResourceNotFoundException;
+import com.example.blowords.common.exception.TooManyRequestException.TooManyRequestException;
 import com.example.blowords.common.exception.UnauthorizedException.UnauthorizedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,15 +20,6 @@ import org.slf4j.LoggerFactory;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    
-    /**
-     * 处理业务逻辑异常（自定义异常）
-     */
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<?>> handleBusinessException(BusinessException ex) {
-        return ResponseEntity.badRequest()
-                .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
-    }
 
     /**
      * 处理资源冲突异常
@@ -35,7 +27,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceConflictException.class)
     public ResponseEntity<ApiResponse<?>> handleResourceConflictException(ResourceConflictException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage(), false));
     }
 
     /**
@@ -44,7 +36,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalParameterException.class)
     public ResponseEntity<ApiResponse<?>> handleIllegalParameterException(IllegalParameterException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage(), false));
     }
 
     /**
@@ -53,7 +45,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<?>> handleResourceNotFoundException(ResourceNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage(), false));
     }
 
     /**
@@ -62,7 +54,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InternalServerErrorException.class)
     public ResponseEntity<ApiResponse<?>> handleInternalServerErrorException(InternalServerErrorException ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage(), false));
     }
 
     /**
@@ -71,7 +63,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<?>> handleUnauthorizedException(UnauthorizedException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage(), false));
+    }
+
+    /**
+     * 处理请求频繁的异常
+     */
+    @ExceptionHandler(TooManyRequestException.class)
+    public ResponseEntity<ApiResponse<?>> handleTooManyRequestException(TooManyRequestException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage(), false));
+    }
+
+    /**
+     * 处理业务逻辑异常（自定义异常）
+     */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<?>> handleBusinessException(BusinessException ex) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage(), false));
     }
 
     /**
@@ -82,7 +92,7 @@ public class GlobalExceptionHandler {
         Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
         logger.error("运行时异常：", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(500, "服务器内部错误"));
+                .body(ApiResponse.error(500, "服务器内部错误", false));
     }
 
     /**
@@ -93,6 +103,6 @@ public class GlobalExceptionHandler {
         Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
         logger.error("系统异常：", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(500, "系统错误"));
+                .body(ApiResponse.error(500, "系统错误", false));
     }
 }

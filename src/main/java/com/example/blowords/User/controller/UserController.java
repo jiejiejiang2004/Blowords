@@ -1,35 +1,35 @@
 package com.example.blowords.User.controller;
 
-// import java.util.Map;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.example.blowords.User.dto.*;
-import com.example.blowords.User.mapper.UserMapper;
 import com.example.blowords.common.exception.CaptchaWrongException;
 import com.example.blowords.common.exception.IllegalParameterException.IllegalEmailFormulaException;
 import com.example.blowords.common.exception.IllegalParameterException.IllegalParameterException;
 import com.example.blowords.common.exception.InternalServerErrorException.CaptchaSendFailException;
 import com.example.blowords.common.exception.InternalServerErrorException.InternalServerErrorException;
 import com.example.blowords.common.exception.ResourceNotFoundException.UserNotFoundException;
+import com.example.blowords.User.dto.*;
+import com.example.blowords.User.mapper.*;
+import com.example.blowords.User.entity.*;
+import com.example.blowords.User.service.*;
 import com.example.blowords.common.util.*;
+import com.example.blowords.common.response.*;
+
+import lombok.NonNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.example.blowords.common.response.ApiResponse;
-import com.example.blowords.common.response.LoginResponse;
-import com.example.blowords.User.entity.User;
-import com.example.blowords.User.service.UserService;
 
 /**
  * <p>
@@ -44,11 +44,12 @@ import com.example.blowords.User.service.UserService;
 @RequestMapping("/api/v1/users")
 public class UserController {
 
+    @Autowired
     private final UserService userService;
 
     @Autowired
     private final JwtUtil jwtUtil;
-    // private final ValidationUtil validationUtil;
+
     private final RedisUtil redisUtil;
     private final UserMapper userMapper;
 
@@ -69,15 +70,14 @@ public class UserController {
         response.put("email", email);
 
         if (!ValidationUtil.isValidEmail(email)) {
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error(422, "邮箱格式错误", response));
+            throw new IllegalEmailFormulaException("邮箱格式错误");
         }
 
         String captcha = VerifyCodeUtil.generateCode(6);
 
         if(userService.sendRegisterCaptcha(email, captcha)) {
             return ResponseEntity.status(HttpStatus.OK)
-                    .body(ApiResponse.success("验证码发送成功"));
+                    .body(ApiResponse.success("验证码发送成功", response));
         } else {
             throw new CaptchaSendFailException("验证码发送失败，请稍后重试");
         }
@@ -138,16 +138,7 @@ public class UserController {
                 String accessToken = jwtUtil.generateToken(userDetails);
                 String refreshToken = jwtUtil.generateRefreshToken(userDetails);
 
-                LoginResponse response = new LoginResponse();
-
-                response.setUid(user.getUserid().toString());
-                response.setUsername(user.getUsername());
-                response.setPhoneNumber(user.getTelephone());
-                response.setEmail(user.getEmail());
-                response.setNickname(user.getNickname() != null ? user.getNickname() : user.getUsername()); // 如果没有昵称，使用用户名
-                response.setAvatarUrl(user.getAvatarUrl() != null ? user.getAvatarUrl() : "/avatarUrl/u" + String.format("%04d", user.getUserid()) + ".png"); // 默认头像
-                response.setAccessToken(accessToken);
-                response.setRefreshToken(refreshToken);
+                LoginResponse response = getLoginResponse(user, accessToken, refreshToken);
 
                 redisUtil.set("refreshToken:" + user.getUsername(), refreshToken, jwtUtil.getRefreshExpirationTime());
                 redisUtil.set("accessToken:" + user.getUsername(), accessToken, jwtUtil.getAccessExpirationTime());
@@ -164,6 +155,20 @@ public class UserController {
         }
     }
 
+    private static @NonNull LoginResponse getLoginResponse(User user, String accessToken, String refreshToken) {
+        LoginResponse response = new LoginResponse();
+
+        response.setUid(user.getUserid().toString());
+        response.setUsername(user.getUsername());
+        response.setPhoneNumber(user.getTelephone());
+        response.setEmail(user.getEmail());
+        response.setNickname(user.getNickname() != null ? user.getNickname() : user.getUsername()); // 如果没有昵称，使用用户名
+        response.setAvatarUrl(user.getAvatarUrl() != null ? user.getAvatarUrl() : "/avatarUrl/u" + String.format("%04d", user.getUserid()) + ".png"); // 默认头像
+        response.setAccessToken(accessToken);
+        response.setRefreshToken(refreshToken);
+        return response;
+    }
+
     @GetMapping("/me/account")
     public ResponseEntity<ApiResponse<?>> getAccountInfo(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -172,7 +177,6 @@ public class UserController {
                 .body(ApiResponse.success(account));
     }
 
-    // PATCH：更新账户信息（核心新增接口）
     @PatchMapping("/me/account")
     public ResponseEntity<ApiResponse<?>> updateAccountInfo(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -251,9 +255,12 @@ public class UserController {
         String email = captchaDTO.getEmail();
         String captcha = VerifyCodeUtil.generateCode(6);
 
+        Map<String, String> response = new HashMap<>();
+        response.put("email", email);
+
         if(userService.sendResetPasswordCode(email, captcha)) {
             return ResponseEntity.status(HttpStatus.OK)
-                    .body(ApiResponse.success("验证码发送成功"));
+                    .body(ApiResponse.success("验证码发送成功", response));
         } else {
             throw new InternalServerErrorException("未知错误, 发送密码重置验证码失败");
         }

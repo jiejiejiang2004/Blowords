@@ -15,6 +15,7 @@ import com.example.blowords.common.exception.ResourceConflictException.Telephone
 import com.example.blowords.common.exception.ResourceConflictException.UserExistsException;
 import com.example.blowords.common.exception.ResourceConflictException.UsernameExistException;
 import com.example.blowords.common.exception.ResourceNotFoundException.EmailNotFoundException;
+import com.example.blowords.common.exception.ResourceNotFoundException.UserNotFoundException;
 import com.example.blowords.common.exception.TooManyRequestException.GetTooManyCaptchaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,31 +147,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new EmailNotFoundException("邮箱不存在");
         }
 
-        try {
-            User existingUser = userMapper.selectOne(new QueryWrapper<User>().eq("email", email));
-            if (existingUser != null && existingUser.getEmail().equals(email)) {
-                throw new IllegalEmailFormulaException("邮箱已注册");
-            }
-        } catch (Exception e) {
-            Logger logger = LoggerFactory.getLogger(UserController.class);
-            logger.error("注册异常：", e);
-            throw new InternalServerErrorException(/*e.getMessage()*/"未知异常,注册失败");
+        User existingUser = userMapper.selectOne(new QueryWrapper<User>().eq("email", email));
+        if (existingUser != null && existingUser.getEmail().equals(email)) {
+            throw new IllegalEmailFormulaException("邮箱已注册");
         }
 
         String redisKey = "email:registerCaptcha:" + email;
-        try {
-            if (redisUtil.exists(redisKey)) {
-                throw new GetTooManyCaptchaException("请求频繁,请稍后再试");
-            }
 
-            emailService.sendEmail(email, captcha, "Blowords注册验证码");
-            redisUtil.set(redisKey, captcha, 300);
-        } catch (Exception e) {
-            e.printStackTrace();
-            Logger logger = LoggerFactory.getLogger(UserController.class);
-            logger.error("注册异常：", e);
-            throw new InternalServerErrorException(/*e.getMessage()*/"未知异常,注册失败");
+        if (redisUtil.exists(redisKey)) {
+            throw new GetTooManyCaptchaException("请求频繁,请稍后再试");
         }
+
+        emailService.sendEmail(email, captcha, "Blowords注册验证码");
+        redisUtil.set(redisKey, captcha, 300);
         return true;
     }
 
@@ -187,11 +176,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new UserNotFoundException("用户不存在");
         }
 
         if (!PasswordEncryptUtil.matches(password, user.getPassword())) {
-            throw new RuntimeException("密码错误");
+            throw new PasswordEqualException("密码错误");
         }
 
         return user;
